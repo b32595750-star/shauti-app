@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>Шаути-Аналитик | Telegram Mini App</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--tg-theme-bg-color, #0a0f1c);
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            padding: 16px 12px 40px;
+            color: var(--tg-theme-text-color, #eef3ff);
+            min-height: 100vh;
+        }
+        /* Telegram темы */
+        body[data-theme="dark"] {
+            --bg: #0a0f1c;
+            --card-bg: rgba(18, 25, 45, 0.9);
+            --text: #eef3ff;
+            --border: rgba(90, 120, 240, 0.35);
+        }
+        body[data-theme="light"] {
+            --bg: #f0f2f5;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --text: #1a1a2e;
+            --border: rgba(90, 120, 240, 0.5);
+        }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card {
+            background: var(--tg-theme-secondary-bg-color, rgba(12, 18, 32, 0.85));
+            backdrop-filter: blur(12px);
+            border-radius: 1.5rem;
+            border: 1px solid var(--tg-theme-hint-color, rgba(90, 120, 240, 0.35));
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 0.8rem;
+            gap: 6px;
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--tg-theme-text-color, #fff), #b7c4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chip {
+            background: var(--tg-theme-hint-color, #1f2a4e);
+            padding: 2px 8px;
+            border-radius: 40px;
+            font-size: 0.6rem;
+            font-weight: 500;
+            color: var(--tg-theme-text-color, #b7c4ff);
+        }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.6rem; margin-bottom: 0.8rem; }
+        .param-card { background: var(--tg-theme-bg-color, #050b17); border-radius: 1rem; padding: 0.6rem; border-left: 3px solid #5f7aff; }
+        .param-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--tg-theme-hint-color, #9aabdf); margin-bottom: 3px; font-weight: 600; }
+        .value-large { font-size: 1.2rem; font-weight: 800; display: flex; align-items: baseline; gap: 4px; }
+        input[type="range"] { width: 100%; background: #192040; height: 4px; border-radius: 10px; -webkit-appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #8c9eff; border-radius: 50%; cursor: pointer; }
+        select { background: var(--tg-theme-bg-color, #050b17); border: 1px solid var(--tg-theme-hint-color, #2f3b68); border-radius: 2rem; padding: 5px 8px; color: var(--tg-theme-text-color, white); width: 100%; font-size: 0.7rem; cursor: pointer; }
+        .result-block { background: var(--tg-theme-bg-color, #01040e); border-radius: 1rem; padding: 0.6rem; text-align: center; margin-top: 0.6rem; }
+        .ksh-number { font-size: 2.2rem; font-weight: 800; transition: all 0.2s ease; display: inline-block; }
+        .risk-tag { display: inline-block; padding: 3px 10px; border-radius: 40px; font-weight: 600; font-size: 0.65rem; }
+        button { background: var(--tg-theme-button-color, #29335c); border: none; padding: 8px 14px; border-radius: 2rem; font-weight: 600; color: var(--tg-theme-button-text-color, white); cursor: pointer; transition: 0.2s; }
+        button.primary { background: var(--tg-theme-button-color, #5f7aff); }
+        .flex-buttons { display: flex; gap: 6px; margin-top: 0.6rem; flex-wrap: wrap; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.6rem; }
+        .history-table th, .history-table td { padding: 5px 3px; border-bottom: 1px solid var(--tg-theme-hint-color, #202a4a); text-align: left; }
+        .positive { color: #a6ffbc; }
+        .negative { color: #ff9eaa; }
+        .graph-container { background: var(--tg-theme-bg-color, #030715); border-radius: 1rem; padding: 0.5rem; margin-top: 0.5rem; }
+        .alert-message { background: rgba(255, 80, 100, 0.12); border-left: 3px solid #ff7b89; padding: 6px; border-radius: 0.6rem; font-size: 0.6rem; margin-top: 6px; }
+        .comparison-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.6rem; }
+        .comparison-card { flex: 1; background: var(--tg-theme-bg-color, #0a1022); border-radius: 0.8rem; padding: 0.5rem; border: 1px solid var(--tg-theme-hint-color, #2f3b6e); }
+        .flag-item { display: flex; align-items: center; gap: 5px; margin: 4px 0; font-size: 0.65rem; cursor: pointer; }
+        footer { text-align: center; font-size: 0.55rem; margin-top: 1rem; color: var(--tg-theme-hint-color, #5b6b9b); }
+        .toggle-switch { display: flex; align-items: center; gap: 5px; background: var(--tg-theme-bg-color, #0f1428); padding: 3px 8px; border-radius: 2rem; font-size: 0.6rem; }
+        .goal-input { background: var(--tg-theme-bg-color, #050b17); border-radius: 0.8rem; padding: 5px; margin-top: 5px; display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+        input[type="number"] { background: var(--tg-theme-bg-color, #050b17); border: 1px solid var(--tg-theme-hint-color, #2f3b68); border-radius: 2rem; padding: 4px 8px; color: var(--tg-theme-text-color, white); width: 80px; font-size: 0.65rem; }
+        .cluster-badge { display: inline-block; padding: 3px 10px; border-radius: 40px; font-size: 0.65rem; font-weight: 600; margin-top: 5px; }
+        .inline-help { font-size: 0.55rem; color: var(--tg-theme-hint-color, #8b9ad0); margin-top: 3px; }
+        
+        /* Анимации */
+        @keyframes pulse-gold {
+            0% { text-shadow: 0 0 0px #ffd700; transform: scale(1); }
+            50% { text-shadow: 0 0 20px #ffd700; transform: scale(1.05); }
+            100% { text-shadow: 0 0 0px #ffd700; transform: scale(1); }
+        }
+        @keyframes pulse-silver {
+            0% { text-shadow: 0 0 0px #c0c0c0; transform: scale(1); }
+            50% { text-shadow: 0 0 15px #c0c0c0; transform: scale(1.02); }
+            100% { text-shadow: 0 0 0px #c0c0c0; transform: scale(1); }
+        }
+        @keyframes glow-border {
+            0% { border-color: rgba(90, 120, 240, 0.35); box-shadow: 0 0 0px rgba(255,215,0,0); }
+            50% { border-color: rgba(255, 215, 0, 0.6); box-shadow: 0 0 15px rgba(255,215,0,0.3); }
+            100% { border-color: rgba(90, 120, 240, 0.35); box-shadow: 0 0 0px rgba(255,215,0,0); }
+        }
+        .extra-class-animation { animation: pulse-gold 1.5s ease-in-out infinite; }
+        .high-class-animation { animation: pulse-silver 2s ease-in-out infinite; }
+        .glow-card { animation: glow-border 2s ease-in-out infinite; }
+        
+        /* Telegram адаптация */
+        .telegram-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid var(--tg-theme-hint-color, #2f3b68);
+            font-size: 0.55rem;
+            color: var(--tg-theme-hint-color);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Основная карточка -->
+    <div class="card" id="mainCard">
+        <div class="card-header">
+            <div class="card-title">✨ KSh · Оценка шаути</div>
+            <div class="toggle-switch"><span>🔒 Скрытый</span><input type="checkbox" id="blindModeToggle"></div>
+        </div>
+        <div class="grid-3">
+            <div class="param-card">
+                <div class="param-label">👀 ВН (внешность)</div>
+                <input type="range" id="vn" min="0" max="10" step="0.5" value="7">
+                <div class="value-large"><span id="vnVal">7.0</span>/10</div>
+            </div>
+            <div class="param-card">
+                <div class="param-label">🧠 Х (характер)</div>
+                <input type="range" id="x" min="0" max="10" step="0.5" value="6.5">
+                <div class="value-large"><span id="xVal">6.5</span>/10</div>
+            </div>
+            <div class="param-card">
+                <div class="param-label">💔 Д (драма)</div>
+                <input type="range" id="d" min="0" max="10" step="0.5" value="4.5">
+                <div class="value-large"><span id="dVal">4.5</span>/10</div>
+            </div>
+        </div>
+        <div class="grid-3" style="grid-template-columns:1fr 1fr 1fr;">
+            <div><label class="param-label">✨ Кн</label><select id="kn"><option value="1.0">1.0 обычная</option><option value="1.5" selected>1.5 редкая</option></select></div>
+            <div><label class="param-label">⚖️ Кх</label><select id="kx"><option value="0.5">0.5 убивает</option><option value="1.0" selected>1.0 баланс</option><option value="1.5">1.5 усиливает</option></select></div>
+            <div><label class="param-label">🔥 Кд</label><select id="kd"><option value="0.5">0.5 нет</option><option value="1.0" selected>1.0 норма</option><option value="2.0">2.0 беда</option></select></div>
+        </div>
+        <div class="result-block">
+            <div>🏆 KSh шаути</div>
+            <div class="ksh-number" id="kshValue">???</div>
+            <div id="kshLevel" class="risk-tag">🔒 Скрытый режим</div>
+            <div id="clusterDisplay" class="cluster-badge">—</div>
+        </div>
+        <div class="flex-buttons">
+            <button id="revealBtn" class="primary">🔓 Показать</button>
+            <button id="saveBtn">💾 Сохранить</button>
+            <button id="resetHistoryBtn">🗑️ Сброс</button>
+        </div>
+        <div class="telegram-footer">
+            <span>📱 Telegram Mini App</span>
+            <span>v5.0</span>
+        </div>
+    </div>
+
+    <!-- Красные флаги (упрощённые для мобильных) -->
+    <div class="card">
+        <div class="card-header"><div class="card-title">🚩 Проблемы</div><div class="chip">каждый = -1</div></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 🗣️ Жалуется</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 📱 В телефоне</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 💰 Ждёт оплату</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 🎭 Меняет мнение</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 🔥 Конфликты</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 📞 Исчезает</label>
+        </div>
+        <div class="goal-input" style="margin-top:8px;">
+            <span>🎯 Цель KSh:</span>
+            <input type="number" id="goalKsh" step="0.5" placeholder="напр. 14">
+            <button id="setGoalBtn">Поставить</button>
+            <span id="goalAdvice" style="font-size:0.6rem;"></span>
+        </div>
+    </div>
+
+    <!-- Сравнение с бывшей -->
+    <div class="card">
+        <div class="card-header"><div class="card-title">📎 Сравнение</div></div>
+        <div class="comparison-row">
+            <div class="comparison-card"><h4 style="font-size:0.7rem;">👤 Текущая</h4><div id="currentForCompare">—</div></div>
+            <div class="comparison-card"><h4 style="font-size:0.7rem;">👤 Бывшая</h4><div id="exCompare">нет данных<br><button id="saveExBtn" style="margin-top:3px; padding:2px 8px; font-size:0.55rem;">Сохранить</button></div></div>
+        </div>
+        <div id="exComparisonResult" style="font-size:0.65rem; text-align:center; margin-top:4px;">—</div>
+    </div>
+
+    <!-- AI кластеризация -->
+    <div class="card">
+        <div class="card-header"><div class="card-title">🧠 AI анализ</div><div class="chip">типы шаути</div></div>
+        <div id="clusterAnalysis" style="font-size:0.7rem; line-height:1.3;">
+            Анализирую...
+        </div>
+    </div>
+
+    <!-- График -->
+    <div class="card">
+        <div class="card-header"><div class="card-title">📈 Динамика</div><div class="chip">производная</div></div>
+        <div class="graph-container"><canvas id="derivativeChart" height="130"></canvas></div>
+        <div id="trendAlert" class="alert-message">Сохраните несколько замеров</div>
+        <div style="overflow-x:auto; margin-top:6px;">
+            <table class="history-table" id="historyTable">
+                <thead><tr><th>Дата</th><th>ВН</th><th>Х</th><th>Д</th><th>KSh</th><th>Δ</th></tr></thead>
+                <tbody id="historyTbody"><tr><td colspan="6">Нет записей</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Инициализация Telegram WebApp ---
+    let tg = window.Telegram?.WebApp;
+    if (tg) {
+        tg.expand(); // Растянуть на всё окно
+        tg.enableClosingConfirmation(); // Подтверждение при закрытии
+        // Применяем тему Telegram
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#0a0f1c';
+        document.body.style.color = tg.themeParams.text_color || '#eef3ff';
+        tg.ready();
+    }
+
+    // --- Данные ---
+    let measurements = [];
+    let chartInstance = null;
+    let blindMode = true;
+    let exProfile = null;
+
+    // --- DOM элементы ---
+    const vn = document.getElementById('vn'), x = document.getElementById('x'), d = document.getElementById('d');
+    const kn = document.getElementById('kn'), kx = document.getElementById('kx'), kd = document.getElementById('kd');
+    const vnVal = document.getElementById('vnVal'), xVal = document.getElementById('xVal'), dVal = document.getElementById('dVal');
+    const kshValue = document.getElementById('kshValue'), kshLevel = document.getElementById('kshLevel');
+    const clusterDisplay = document.getElementById('clusterDisplay');
+    const blindToggle = document.getElementById('blindModeToggle');
+    const revealBtn = document.getElementById('revealBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetHistoryBtn = document.getElementById('resetHistoryBtn');
+    const redFlags = document.querySelectorAll('.redFlag');
+    const currentForCompare = document.getElementById('currentForCompare');
+    const exCompare = document.getElementById('exCompare');
+    const exComparisonResult = document.getElementById('exComparisonResult');
+    const saveExBtn = document.getElementById('saveExBtn');
+    const goalKshInput = document.getElementById('goalKsh');
+    const setGoalBtn = document.getElementById('setGoalBtn');
+    const goalAdvice = document.getElementById('goalAdvice');
+    const historyTbody = document.getElementById('historyTbody');
+    const trendAlert = document.getElementById('trendAlert');
+    const mainCard = document.getElementById('mainCard');
+    const clusterAnalysisDiv = document.getElementById('clusterAnalysis');
+
+    // --- Функции расчёта ---
+    function computeKSh(v, xv, dv, knV, kxV, kdV) {
+        return (v * knV) + (xv * kxV) - (dv * kdV);
+    }
+    function getCurrentRaw() {
+        return {
+            vn: parseFloat(vn.value), x: parseFloat(x.value), d: parseFloat(d.value),
+            kn: parseFloat(kn.value), kx: parseFloat(kx.value), kd: parseFloat(kd.value)
+        };
+    }
+    function getFlagsPenalty() {
+        let p = 0;
+        redFlags.forEach(f => { if (f.checked) p += 1; });
+        return p;
+    }
+    function getFinalKsh() {
+        let r = getCurrentRaw();
+        let raw = computeKSh(r.vn, r.x, r.d, r.kn, r.kx, r.kd);
+        return Math.max(0, raw - getFlagsPenalty());
+    }
+
+    // --- AI Кластеризация ---
+    function getClusterType(vnVal, xVal, dVal, kshVal) {
+        if (kshVal >= 19) return { name: '💎 ЭКСТРАКЛАСС', desc: 'Идеал', color: '#ffd700', class: 'extra' };
+        if (kshVal >= 15) return { name: '🌟 ВЫСОКИЙ', desc: 'Отличный вариант', color: '#c0c0c0', class: 'high' };
+        if (vnVal >= 8 && xVal >= 7 && dVal <= 3) return { name: '👼 АНГЕЛ', desc: 'Красивая и добрая', color: '#88aaff', class: 'normal' };
+        if (vnVal >= 8 && dVal >= 7) return { name: '🔥 ТОКСИН', desc: 'Красивая, но опасная', color: '#ff8888', class: 'normal' };
+        if (xVal >= 7 && dVal <= 4) return { name: '💛 ЗОЛОТАЯ СЕРЕДИНА', desc: 'Надёжный партнёр', color: '#88ffaa', class: 'normal' };
+        if (vnVal <= 5 && xVal >= 7) return { name: '📚 ЗАГАДКА', desc: 'Душа компании', color: '#ddaaff', class: 'normal' };
+        if (vnVal >= 7 && xVal <= 4) return { name: '💃 КРАСОТКА', desc: 'Красивая, но сложная', color: '#ffaa88', class: 'normal' };
+        if (dVal >= 7) return { name: '⚠️ ДРАМА-КВИН', desc: 'Токсичность зашкаливает', color: '#ff6666', class: 'normal' };
+        return { name: '📊 СРЕДНИЙ ТИП', desc: 'Наблюдай дальше', color: '#aaaaff', class: 'normal' };
+    }
+
+    // --- Анимация ---
+    function applyAnimation(kshVal) {
+        mainCard.classList.remove('glow-card');
+        kshValue.classList.remove('extra-class-animation', 'high-class-animation');
+        if (kshVal >= 19) {
+            mainCard.classList.add('glow-card');
+            kshValue.classList.add('extra-class-animation');
+        } else if (kshVal >= 15) {
+            kshValue.classList.add('high-class-animation');
+        }
+    }
+
+    // --- Анализ всех шаути ---
+    function analyzeClusters() {
+        if (measurements.length === 0) {
+            clusterAnalysisDiv.innerHTML = '📊 Нет данных. Сохрани несколько шаути.';
+            return;
+        }
+        let clusters = {};
+        measurements.forEach(m => {
+            let cluster = getClusterType(m.vn, m.x, m.d, m.ksh);
+            if (!clusters[cluster.name]) clusters[cluster.name] = [];
+            clusters[cluster.name].push(m);
+        });
+        let html = '<div style="display:flex; flex-direction:column; gap:4px;">';
+        for (let [type, items] of Object.entries(clusters)) {
+            let avgKsh = (items.reduce((s, m) => s + m.ksh, 0) / items.length).toFixed(1);
+            let color = '#aaaaff';
+            if (type.includes('ЭКСТРА')) color = '#ffd700';
+            else if (type.includes('ВЫСОКИЙ')) color = '#c0c0c0';
+            else if (type.includes('АНГЕЛ')) color = '#88aaff';
+            else if (type.includes('ТОКСИН')) color = '#ff8888';
+            else if (type.includes('ЗОЛОТАЯ')) color = '#88ffaa';
+            else if (type.includes('ЗАГАДКА')) color = '#ddaaff';
+            else if (type.includes('КРАСОТКА')) color = '#ffaa88';
+            else if (type.includes('ДРАМА')) color = '#ff6666';
+            html += `<div style="border-left: 2px solid ${color}; padding-left: 6px; margin-bottom: 3px;">
+                <strong style="color:${color};">${type}</strong> — ${items.length} шт. (ср. ${avgKsh})
+            </div>`;
+        }
+        html += '</div>';
+        clusterAnalysisDiv.innerHTML = html;
+    }
+
+    // --- Обновление UI ---
+    function updateAllUI(forceShow = false) {
+        let r = getCurrentRaw();
+        let finalKsh = getFinalKsh();
+        vnVal.innerText = r.vn.toFixed(1);
+        xVal.innerText = r.x.toFixed(1);
+        dVal.innerText = r.d.toFixed(1);
+        
+        let currentCluster = getClusterType(r.vn, r.x, r.d, finalKsh);
+        clusterDisplay.innerHTML = `${currentCluster.name} — ${currentCluster.desc}`;
+        clusterDisplay.style.background = `${currentCluster.color}20`;
+        clusterDisplay.style.border = `1px solid ${currentCluster.color}`;
+        applyAnimation(finalKsh);
+        
+        if (blindMode && !forceShow) {
+            kshValue.innerText = '???';
+            kshLevel.innerHTML = '🔒 Скрытый режим';
+        } else {
+            kshValue.innerText = finalKsh.toFixed(1);
+            let levelText = finalKsh <= 5 ? '🔴 Низкий' : (finalKsh <= 12 ? '🟡 Средний' : (finalKsh <= 18 ? '🟢 Высокий' : '💎 Экстракласс'));
+            kshLevel.innerHTML = levelText;
+        }
+        
+        currentForCompare.innerHTML = `ВН:${r.vn.toFixed(1)} Х:${r.x.toFixed(1)} Д:${r.d.toFixed(1)}<br>KSh:${finalKsh.toFixed(1)}<br>${currentCluster.name}`;
+        if (exProfile) {
+            let diff = finalKsh - exProfile.ksh;
+            exComparisonResult.innerHTML = `📊 Разница: ${diff > 0 ? '+' : ''}${diff.toFixed(1)}. ${diff > 0 ? 'Текущая лучше' : 'Бывшая была сильнее'}`;
+        } else {
+            exComparisonResult.innerHTML = '—';
+        }
+        
+        let goal = parseFloat(goalKshInput.value);
+        if (!isNaN(goal)) {
+            goalAdvice.innerHTML = finalKsh < goal ? `До цели: ${(goal - finalKsh).toFixed(1)}` : '✅ Цель достигнута!';
+        }
+        
+        // Отправка данных в Telegram (опционально)
+        if (tg && !blindMode) {
+            tg.MainButton?.setText(`KSh: ${finalKsh.toFixed(1)}`).show();
+        }
+    }
+
+    // --- Сохранение ---
+    function saveMeasurement() {
+        let r = getCurrentRaw();
+        let finalKsh = getFinalKsh();
+        let cluster = getClusterType(r.vn, r.x, r.d, finalKsh);
+        let now = new Date();
+        let dateStr = now.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+        let entry = {
+            id: Date.now(), date: dateStr, timestamp: now.getTime(),
+            vn: r.vn, x: r.x, d: r.d, kn: r.kn, kx: r.kx, kd: r.kd,
+            ksh: finalKsh, penalty: getFlagsPenalty(), cluster: cluster.name
+        };
+        measurements.unshift(entry);
+        if (measurements.length > 30) measurements.pop();
+        localStorage.setItem('shauthi_tg', JSON.stringify(measurements));
+        renderHistoryAndGraph();
+        updateAllUI(!blindMode);
+        updateTrendMessage();
+        analyzeClusters();
+        
+        // Вибрация на Telegram (если доступна)
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    }
+
+    // --- Отрисовка истории и графика ---
+    function renderHistoryAndGraph() {
+        if (!measurements.length) {
+            historyTbody.innerHTML = '<tr><td colspan="6">Нет записей</td></tr>';
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            return;
+        }
+        let html = '';
+        for (let i = 0; i < measurements.length; i++) {
+            let m = measurements[i];
+            let delta = '';
+            if (i < measurements.length - 1) {
+                let diff = m.ksh - measurements[i + 1].ksh;
+                delta = `<span class="${diff >= 0 ? 'positive' : 'negative'}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}</span>`;
+            } else delta = '—';
+            html += `<tr>
+                <td>${m.date}</td>
+                <td>${m.vn.toFixed(1)}</td>
+                <td>${m.x.toFixed(1)}</td>
+                <td>${m.d.toFixed(1)}</td>
+                <td><strong>${m.ksh.toFixed(1)}</strong></td>
+                <td>${delta}</td>
+            </tr>`;
+        }
+        historyTbody.innerHTML = html;
+        
+        let sorted = [...measurements].sort((a, b) => a.timestamp - b.timestamp);
+        if (sorted.length < 2) {
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            return;
+        }
+        let labels = [], deriv = [];
+        for (let i = 1; i < sorted.length; i++) {
+            labels.push(sorted[i].date.slice(0, 5));
+            deriv.push(sorted[i].ksh - sorted[i - 1].ksh);
+        }
+        const ctx = document.getElementById('derivativeChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets: [{ label: 'ΔKSh', data: deriv, borderColor: '#8f9eff', backgroundColor: 'rgba(100,130,255,0.1)', borderWidth: 2, pointRadius: 2, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#ccd6ff', font: { size: 8 } } } }, scales: { y: { grid: { color: '#232e52' } } } }
+        });
+    }
+
+    function updateTrendMessage() {
+        if (measurements.length < 3) {
+            trendAlert.innerHTML = '📌 Сохраните 3+ замера';
+            return;
+        }
+        let sorted = [...measurements].sort((a, b) => a.timestamp - b.timestamp);
+        let d1 = sorted[sorted.length - 1].ksh - sorted[sorted.length - 2].ksh;
+        let d2 = sorted[sorted.length - 2].ksh - sorted[sorted.length - 3].ksh;
+        if (d1 < 0 && d2 < 0) trendAlert.innerHTML = '🚨 ДВА ПАДЕНИЯ ПОДРЯД!';
+        else if (d1 < 0) trendAlert.innerHTML = '📉 Последний замер упал';
+        else trendAlert.innerHTML = '📈 Тренд положительный';
+    }
+
+    function resetHistory() {
+        if (confirm('Удалить всю историю?')) {
+            measurements = [];
+            localStorage.removeItem('shauthi_tg');
+            renderHistoryAndGraph();
+            updateAllUI(!blindMode);
+            updateTrendMessage();
+            analyzeClusters();
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+        }
+    }
+
+    function loadData() {
+        let stored = localStorage.getItem('shauthi_tg');
+        if (stored) {
+            try {
+                measurements = JSON.parse(stored);
+                if (!Array.isArray(measurements)) measurements = [];
+            } catch(e) { measurements = []; }
+        }
+        if (measurements.length === 0) {
+            let now = new Date();
+            let demo = {
+                id: 1, date: now.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}),
+                timestamp: now.getTime(), vn: 7.5, x: 6.5, d: 4.0, kn: 1.5, kx: 1.0, kd: 1.0,
+                ksh: (7.5*1.5)+(6.5*1)-(4.0*1), penalty: 0, cluster: '🌟 ВЫСОКИЙ'
+            };
+            measurements = [demo];
+            localStorage.setItem('shauthi_tg', JSON.stringify(measurements));
+        }
+        renderHistoryAndGraph();
+        updateAllUI(false);
+        updateTrendMessage();
+        analyzeClusters();
+    }
+
+    // --- События ---
+    vn.addEventListener('input', () => updateAllUI(!blindMode));
+    x.addEventListener('input', () => updateAllUI(!blindMode));
+    d.addEventListener('input', () => updateAllUI(!blindMode));
+    kn.addEventListener('change', () => updateAllUI(!blindMode));
+    kx.addEventListener('change', () => updateAllUI(!blindMode));
+    kd.addEventListener('change', () => updateAllUI(!blindMode));
+    redFlags.forEach(f => f.addEventListener('change', () => updateAllUI(!blindMode)));
+    blindToggle.addEventListener('change', (e) => { blindMode = e.target.checked; updateAllUI(!blindMode); });
+    revealBtn.addEventListener('click', ()
