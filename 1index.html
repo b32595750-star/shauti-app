@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Шаути-Аналитик | Telegram Mini App</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js?56"></script>
+    <!-- Chart.js для графиков -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--tg-theme-bg-color, #0a0f1c);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
+            padding: 16px 12px 40px;
+            color: var(--tg-theme-text-color, #eef3ff);
+            min-height: 100vh;
+        }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card {
+            background: var(--tg-theme-secondary-bg-color, rgba(12, 18, 32, 0.9));
+            border-radius: 1.5rem;
+            border: 1px solid var(--tg-theme-hint-color, rgba(90, 120, 240, 0.35));
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 0.8rem;
+            gap: 6px;
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #b7c4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 0.8rem; }
+        .param-card { background: var(--tg-theme-bg-color, #050b17); border-radius: 1rem; padding: 0.6rem; border-left: 3px solid #5f7aff; }
+        .param-label { font-size: 0.6rem; text-transform: uppercase; color: var(--tg-theme-hint-color, #9aabdf); margin-bottom: 3px; }
+        .value-large { font-size: 1.2rem; font-weight: 800; }
+        input[type="range"] { width: 100%; background: #192040; height: 4px; border-radius: 10px; -webkit-appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #8c9eff; border-radius: 50%; cursor: pointer; }
+        select { background: var(--tg-theme-bg-color, #050b17); border: 1px solid var(--tg-theme-hint-color, #2f3b68); border-radius: 2rem; padding: 5px 8px; color: white; width: 100%; font-size: 0.7rem; }
+        .result-block { background: var(--tg-theme-bg-color, #01040e); border-radius: 1rem; padding: 0.6rem; text-align: center; margin-top: 0.6rem; }
+        .ksh-number { font-size: 2.5rem; font-weight: 800; }
+        button { background: var(--tg-theme-button-color, #5f7aff); border: none; padding: 8px 14px; border-radius: 2rem; font-weight: 600; color: white; cursor: pointer; }
+        .flex-buttons { display: flex; gap: 6px; margin-top: 0.6rem; flex-wrap: wrap; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.6rem; }
+        .history-table th, .history-table td { padding: 5px 3px; border-bottom: 1px solid #202a4a; text-align: left; }
+        .positive { color: #a6ffbc; }
+        .negative { color: #ff9eaa; }
+        .graph-container { background: #030715; border-radius: 1rem; padding: 0.5rem; margin-top: 0.5rem; }
+        .flag-item { display: inline-flex; align-items: center; gap: 4px; margin: 4px 8px 4px 0; font-size: 0.65rem; cursor: pointer; background: #1a1f3a; padding: 3px 8px; border-radius: 20px; }
+        .cluster-badge { display: inline-block; padding: 3px 10px; border-radius: 40px; font-size: 0.65rem; font-weight: 600; margin-top: 5px; background: #1a1f3a; }
+        footer { text-align: center; font-size: 0.55rem; margin-top: 1rem; color: #5b6b9b; }
+        .goal-input { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+        input[type="number"] { background: #050b17; border: 1px solid #2f3b68; border-radius: 2rem; padding: 4px 8px; color: white; width: 80px; }
+        @keyframes pulse-gold {
+            0% { text-shadow: 0 0 0px #ffd700; transform: scale(1); }
+            50% { text-shadow: 0 0 20px #ffd700; transform: scale(1.05); }
+            100% { text-shadow: 0 0 0px #ffd700; transform: scale(1); }
+        }
+        .extra-class-animation { animation: pulse-gold 1.5s ease-in-out infinite; display: inline-block; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">✨ Шаути-Аналитик</div>
+            <span style="font-size:0.6rem;">v5.0</span>
+        </div>
+        
+        <!-- Параметры -->
+        <div class="grid-3">
+            <div class="param-card">
+                <div class="param-label">👀 ВН (внешность)</div>
+                <input type="range" id="vn" min="0" max="10" step="0.5" value="7">
+                <div class="value-large"><span id="vnVal">7.0</span>/10</div>
+            </div>
+            <div class="param-card">
+                <div class="param-label">🧠 Х (характер)</div>
+                <input type="range" id="x" min="0" max="10" step="0.5" value="6.5">
+                <div class="value-large"><span id="xVal">6.5</span>/10</div>
+            </div>
+            <div class="param-card">
+                <div class="param-label">💔 Д (драма)</div>
+                <input type="range" id="d" min="0" max="10" step="0.5" value="4.5">
+                <div class="value-large"><span id="dVal">4.5</span>/10</div>
+            </div>
+        </div>
+        
+        <!-- Коэффициенты -->
+        <div class="grid-3">
+            <select id="kn"><option value="1.0">Кн 1.0 обычная</option><option value="1.5" selected>Кн 1.5 редкая</option></select>
+            <select id="kx"><option value="0.5">Кх 0.5 убивает</option><option value="1.0" selected>Кх 1.0 баланс</option><option value="1.5">Кх 1.5 усиливает</option></select>
+            <select id="kd"><option value="0.5">Кд 0.5 нет</option><option value="1.0" selected>Кд 1.0 норма</option><option value="2.0">Кд 2.0 беда</option></select>
+        </div>
+        
+        <!-- Результат -->
+        <div class="result-block">
+            <div>🏆 KШаути</div>
+            <div class="ksh-number" id="kshValue">7.8</div>
+            <div id="clusterDisplay" class="cluster-badge">🌟 ВЫСОКИЙ</div>
+        </div>
+        
+        <!-- Кнопки -->
+        <div class="flex-buttons">
+            <button id="saveBtn">💾 Сохранить</button>
+            <button id="resetHistoryBtn">🗑️ Сброс</button>
+        </div>
+    </div>
+
+    <!-- Красные флаги -->
+    <div class="card">
+        <div class="card-title" style="font-size:1rem;">🚩 Проблемы</div>
+        <div id="flagsContainer">
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 🗣️ Постоянно жалуется</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 📱 Зависает в телефоне</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 💰 Ждёт что оплатишь</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 🎭 Меняет мнение</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 🔥 Конфликты на пустом месте</label>
+            <label class="flag-item"><input type="checkbox" class="redFlag"> 📞 Исчезает без объяснений</label>
+        </div>
+        <div class="goal-input">
+            <span>🎯 Цель KSh:</span>
+            <input type="number" id="goalKsh" step="0.5" placeholder="14">
+            <button id="setGoalBtn">Поставить</button>
+            <span id="goalAdvice" style="font-size:0.6rem;"></span>
+        </div>
+    </div>
+
+    <!-- График -->
+    <div class="card">
+        <div class="card-title" style="font-size:1rem;">📈 Динамика</div>
+        <div class="graph-container"><canvas id="derivativeChart" height="120"></canvas></div>
+        <div style="overflow-x:auto; margin-top:8px;">
+            <table class="history-table" id="historyTable">
+                <thead><tr><th>Дата</th><th>ВН</th><th>Х</th><th>Д</th><th>KSh</th><th>Δ</th></tr></thead>
+                <tbody id="historyTbody"><tr><td colspan="6">Нет записей</td></tr></tbody>
+            </table>
+        </div>
+        <div id="trendAlert" style="font-size:0.6rem; margin-top:6px; color:#ffaa66;">📌 Сохраните несколько замеров</div>
+    </div>
+    
+    <footer>Шаути-Аналитик · Данные сохраняются локально</footer>
+</div>
+
+<script>
+    // --- Данные ---
+    let measurements = [];
+    let chartInstance = null;
+    
+    // DOM элементы
+    const vn = document.getElementById('vn'), x = document.getElementById('x'), d = document.getElementById('d');
+    const kn = document.getElementById('kn'), kx = document.getElementById('kx'), kd = document.getElementById('kd');
+    const vnVal = document.getElementById('vnVal'), xVal = document.getElementById('xVal'), dVal = document.getElementById('dVal');
+    const kshValue = document.getElementById('kshValue');
+    const clusterDisplay = document.getElementById('clusterDisplay');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetHistoryBtn = document.getElementById('resetHistoryBtn');
+    const redFlags = document.querySelectorAll('.redFlag');
+    const goalKshInput = document.getElementById('goalKsh');
+    const setGoalBtn = document.getElementById('setGoalBtn');
+    const goalAdvice = document.getElementById('goalAdvice');
+    const historyTbody = document.getElementById('historyTbody');
+    const trendAlert = document.getElementById('trendAlert');
+    
+    // --- Функции ---
+    function computeKSh(v, xv, dv, knV, kxV, kdV) {
+        return (v * knV) + (xv * kxV) - (dv * kdV);
+    }
+    
+    function getCurrentRaw() {
+        return {
+            vn: parseFloat(vn.value), x: parseFloat(x.value), d: parseFloat(d.value),
+            kn: parseFloat(kn.value), kx: parseFloat(kx.value), kd: parseFloat(kd.value)
+        };
+    }
+    
+    function getFlagsPenalty() {
+        let p = 0;
+        redFlags.forEach(f => { if (f.checked) p += 1; });
+        return p;
+    }
+    
+    function getFinalKsh() {
+        let r = getCurrentRaw();
+        let raw = computeKSh(r.vn, r.x, r.d, r.kn, r.kx, r.kd);
+        return Math.max(0, raw - getFlagsPenalty());
+    }
+    
+    function getClusterType(vnVal, xVal, dVal, kshVal) {
+        if (kshVal >= 19) return { name: '💎 ЭКСТРАКЛАСС', color: '#ffd700' };
+        if (kshVal >= 15) return { name: '🌟 ВЫСОКИЙ', color: '#c0c0c0' };
+        if (vnVal >= 8 && xVal >= 7 && dVal <= 3) return { name: '👼 АНГЕЛ', color: '#88aaff' };
+        if (vnVal >= 8 && dVal >= 7) return { name: '🔥 ТОКСИН', color: '#ff8888' };
+        if (xVal >= 7 && dVal <= 4) return { name: '💛 ЗОЛОТАЯ СЕРЕДИНА', color: '#88ffaa' };
+        if (dVal >= 7) return { name: '⚠️ ДРАМА-КВИН', color: '#ff6666' };
+        return { name: '📊 СРЕДНИЙ ТИП', color: '#aaaaff' };
+    }
+    
+    function updateAllUI() {
+        let r = getCurrentRaw();
+        let finalKsh = getFinalKsh();
+        vnVal.innerText = r.vn.toFixed(1);
+        xVal.innerText = r.x.toFixed(1);
+        dVal.innerText = r.d.toFixed(1);
+        
+        kshValue.innerText = finalKsh.toFixed(1);
+        let cluster = getClusterType(r.vn, r.x, r.d, finalKsh);
+        clusterDisplay.innerHTML = cluster.name;
+        clusterDisplay.style.border = `1px solid ${cluster.color}`;
+        
+        // Анимация для экстракласса
+        if (finalKsh >= 19) {
+            kshValue.classList.add('extra-class-animation');
+        } else {
+            kshValue.classList.remove('extra-class-animation');
+        }
+        
+        // Цель
+        let goal = parseFloat(goalKshInput.value);
+        if (!isNaN(goal)) {
+            goalAdvice.innerHTML = finalKsh < goal ? `До цели: ${(goal - finalKsh).toFixed(1)}` : '✅ Цель достигнута!';
+        }
+    }
+    
+    function saveMeasurement() {
+        let r = getCurrentRaw();
+        let finalKsh = getFinalKsh();
+        let cluster = getClusterType(r.vn, r.x, r.d, finalKsh);
+        let now = new Date();
+        let dateStr = now.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+        let entry = {
+            id: Date.now(), date: dateStr, timestamp: now.getTime(),
+            vn: r.vn, x: r.x, d: r.d, kn: r.kn, kx: r.kx, kd: r.kd,
+            ksh: finalKsh, penalty: getFlagsPenalty(), cluster: cluster.name
+        };
+        measurements.unshift(entry);
+        if (measurements.length > 20) measurements.pop();
+        localStorage.setItem('shauthi_app', JSON.stringify(measurements));
+        renderHistoryAndGraph();
+        updateAllUI();
+        trendAlert.innerText = '✅ Замер сохранён!';
+        setTimeout(() => { if (measurements.length >= 2) trendAlert.innerText = '📈 Следи за динамикой'; }, 1500);
+    }
+    
+    function renderHistoryAndGraph() {
+        if (!measurements.length) {
+            historyTbody.innerHTML = '<tr><td colspan="6">Нет записей</td></tr>';
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            return;
+        }
+        let html = '';
+        for (let i = 0; i < measurements.length; i++) {
+            let m = measurements[i];
+            let delta = '';
+            if (i < measurements.length - 1) {
+                let diff = m.ksh - measurements[i + 1].ksh;
+                delta = `<span class="${diff >= 0 ? 'positive' : 'negative'}">${diff >= 0 ? '+' : ''}${diff.toFixed(1)}</span>`;
+            } else delta = '—';
+            html += `<tr><td>${m.date}</td><td>${m.vn.toFixed(1)}</td><td>${m.x.toFixed(1)}</td><td>${m.d.toFixed(1)}</td><td><strong>${m.ksh.toFixed(1)}</strong></td><td>${delta}</td></tr>`;
+        }
+        historyTbody.innerHTML = html;
+        
+        let sorted = [...measurements].sort((a, b) => a.timestamp - b.timestamp);
+        if (sorted.length < 2) return;
+        
+        let labels = [], deriv = [];
+        for (let i = 1; i < sorted.length; i++) {
+            labels.push(sorted[i].date.slice(0, 5));
+            deriv.push(sorted[i].ksh - sorted[i - 1].ksh);
+        }
+        const ctx = document.getElementById('derivativeChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets: [{ label: 'ΔKSh', data: deriv, borderColor: '#8f9eff', backgroundColor: 'rgba(100,130,255,0.1)', borderWidth: 2, pointRadius: 3, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#ccd6ff', font: { size: 9 } } } } }
+        });
+        
+        // Проверка падений
+        if (deriv.length >= 2 && deriv[deriv.length-1] < 0 && deriv[deriv.length-2] < 0) {
+            trendAlert.innerHTML = '🚨 ДВА ПАДЕНИЯ ПОДРЯД! Снимай розовые очки!';
+        } else if (deriv.length >= 1 && deriv[deriv.length-1] < 0) {
+            trendAlert.innerHTML = '📉 Последний замер упал. Следи дальше.';
+        } else if (deriv.length >= 1) {
+            trendAlert.innerHTML = '📈 Тренд положительный или стабильный.';
+        }
+    }
+    
+    function resetHistory() {
+        if (confirm('Удалить всю историю замеров?')) {
+            measurements = [];
+            localStorage.removeItem('shauthi_app');
+            renderHistoryAndGraph();
+            updateAllUI();
+            trendAlert.innerHTML = '📌 История очищена. Сохраните новый замер.';
+        }
+    }
+    
+    function loadData() {
+        let stored = localStorage.getItem('shauthi_app');
+        if (stored) {
+            try {
+                measurements = JSON.parse(stored);
+                if (!Array.isArray(measurements)) measurements = [];
+            } catch(e) { measurements = []; }
+        }
+        if (measurements.length === 0) {
+            let now = new Date();
+            let demo = {
+                id: 1, date: now.toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}),
+                timestamp: now.getTime(), vn: 7.5, x: 6.5, d: 4.0, kn: 1.5, kx: 1.0, kd: 1.0,
+                ksh: (7.5*1.5)+(6.5*1)-(4.0*1), penalty: 0, cluster: '🌟 ВЫСОКИЙ'
+            };
+            measurements = [demo];
+            localStorage.setItem('shauthi_app', JSON.stringify(measurements));
+        }
+        renderHistoryAndGraph();
+        updateAllUI();
+    }
+    
+    // --- События ---
+    vn.addEventListener('input', updateAllUI);
+    x.addEventListener('input', updateAllUI);
+    d.addEventListener('input', updateAllUI);
+    kn.addEventListener('change', updateAllUI);
+    kx.addEventListener('change', updateAllUI);
+    kd.addEventListener('change', updateAllUI);
+    redFlags.forEach(f => f.addEventListener('change', updateAllUI));
+    saveBtn.addEventListener('click', saveMeasurement);
+    resetHistoryBtn.addEventListener('click', resetHistory);
+    setGoalBtn.addEventListener('click', updateAllUI);
+    
+    // Telegram интеграция
+    if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.expand();
+        window.Telegram.WebApp.ready();
+    }
+    
+    loadData();
+</script>
+</body>
+</html>
